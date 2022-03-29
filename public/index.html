@@ -118,11 +118,13 @@
             );
           });
           socket.on("dirnameBack", ({ success, err }) => {
+            dataSyncingRef.value = false;
             if (!success) {
               antd.message.error("返回上一级失败 : " + err);
             }
           });
           socket.on("openFolder", ({ success, err }) => {
+            dataSyncingRef.value = false;
             if (!success) {
               antd.message.error("打开文件夹失败 : " + err);
             }
