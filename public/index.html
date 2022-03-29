@@ -79,14 +79,17 @@
     const app = createApp({
       setup() {
         let socket = null;
+        const baseUrl = "localhost:10086";
         const dataSyncingRef = ref(false);
         const connectedRef = ref(false);
         const dirnameRef = ref("");
         const filesListRef = ref([]);
-
+        const getUrl = (path) => {
+          return `http://${baseUrl}${path}`;
+        };
         const handleConnection = () => {
           if (socket) return;
-          socket = io("ws://localhost:10086");
+          socket = io(`ws://${baseUrl}`);
           socket.on("connect", () => {
             console.log("已连接");
             socket.emit("init");
@@ -139,7 +142,7 @@
         };
 
         const canIRead = async (url) => {
-          const { data } = await fetch("/fs/canIRead", {
+          const { data } = await fetch(getUrl("/fs/canIRead"), {
             method: "post",
             headers: getHeader(),
             body: JSON.stringify({
@@ -186,7 +189,7 @@
                 modalVisibleRef.value = true;
                 modalContentTypeRef.value = "iframe";
                 setTimeout(() => {
-                  modalContentSrcRef.value = `/fs/read?url=${url}`;
+                  modalContentSrcRef.value = getUrl(`/fs/read?url=${url}`);
                 }, 400);
               }
             }
