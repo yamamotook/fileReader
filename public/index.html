@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" href="./css/antd.css" />
+    <link rel="stylesheet" href="./css/fa/css/font-awesome.min.css" />
+    <link rel="stylesheet" href="./css/index.css" />
+  </head>
+  <body>
+    <div id="root" v-cloak>
+      <div class="view-container">
+        <div class="title">PDF 预览</div>
+        <div class="content-wrapper">
+          <div class="content" v-if="connectedRef">
+            <div class="content-header">
+              <a-button @click="handleBack" :disabled="dataSyncingRef">
+                <i class="fa fa-chevron-left"></i>
+              </a-button>
+              <a-input :value="dirnameRef" :disabled="dataSyncingRef"></a-input>
+              <a-button @click="refreshFileList">
+                <i class="fa fa-refresh"></i>
+              </a-button>
+            </div>
+            <div class="content">
+              <div
+                class="file-item"
+                v-for="file in filesListRef"
+                :key="file.filename"
+                @click="handleFileOpen(file)"
+              >
+                <span class="flex-none">
+                  <i
+                    :class="['file-icon fa', file.isDirectory ? 'fa-folder' : 'fa-file-o']"
+                  ></i>
+                </span>
+                <div class="flex-1">{{ file.filename }}</div>
+              </div>
+            </div>
+          </div>
+          <a-empty v-else />
+        </div>
+      </div>
+      <div class="connect-switch" v-if="!connectedRef">
+        <a-button @click="handleConnection" type="primary">连接服务</a-button>
+      </div>
+      <a-modal
+        v-model:visible="modalVisibleRef"
+        :title="modalTitleRef"
+        width="100%"
+        wrap-class-name="full-modal"
+        :footer="null"
+      >
+        <template v-if="modalContentTypeRef === 'iframe'">
+          <iframe
+            :src="modalContentSrcRef"
+            frameborder="0"
+            width="100%"
+            height="100%"
+          >
+          </iframe>
+        </template>
+      </a-modal>
+    </div>
+  </body>
+  <script src="./js/vue.global.js"></script>
+  <script src="./js/dayjs.min.js"></script>
+  <script src="./js/antd.min.js"></script>
+  <script type="module">
+    import { io } from "./js/socket.io.esm.min.js";
+    const { createApp, ref, unref } = Vue;
+    const getHeader = () => {
+      return {
+        "Content-Type": "application/json",
+      };
+    };
+    const app = createApp({
+      setup() {
+        let socket = null;
+        const dataSyncingRef = ref(false);
+        const connectedRef = ref(false);
+        const dirnameRef = ref("");
+        const filesListRef = ref([]);
+
+        const handleConnection = () => {
+          if (socket) return;
+          socket = io("ws://localhost:10086");
+          socket.on("connect", () => {
+            console.log("已连接");
+            socket.emit("init");
+            connectedRef.value = true;
+          });
+          socket.on("reconnect", () => {
+            console.log("重新连接");
+            connectedRef.value = true;
+          });
+          socket.on("disconnected", () => {
+            console.log("已断开");
+            connectedRef.value = true;
+          });
+          socket.on("cwdNotExsit", (data) => {
+            console.log("filenotExsit", data);
+          });
+          socket.on("cwdUpdated", (data) => {
+            dirnameRef.value = data.payload.cwd;
+          });
+          socket.on("filesListUpdated", (data) => {
+            console.log("filesList", data);
+            dataSyncingRef.value = false;
+            dirnameRef.value = data.payload.dirname;
+            filesListRef.value = data.payload.children.sort(
+              ({ isDirectory: a }, { isDirectory: b }) => b - a
+            );
+          });
+          socket.on("dirnameBack", ({ success, err }) => {
+            if (!success) {
+              antd.message.error("返回上一级失败 : " + err);
+            }
+          });
+          socket.on("openFolder", ({ success, err }) => {
+            if (!success) {
+              antd.message.error("打开文件夹失败 : " + err);
+            }
+          });
+        };
+
+        const handleBack = () => {
+          dataSyncingRef.value = true;
+          socket.emit("dirnameBack", (data) => {
+            console.log(data);
+          });
+        };
+
+        const refreshFileList = () => {
+          dataSyncingRef.value = true;
+          socket.emit("filesListUpdate");
+        };
+
+        const canIRead = async (url) => {
+          const { data } = await fetch("/fs/canIRead", {
+            method: "post",
+            headers: getHeader(),
+            body: JSON.stringify({
+              url,
+            }),
+          }).then((resp) => resp.json());
+          if (!data.flag) {
+            antd.message.error(data.msg);
+          }
+          return data.flag;
+        };
+
+        const modalVisibleRef = ref(false);
+        const modalTitleRef = ref("");
+        const modalContentTypeRef = ref("");
+        const modalContentSrcRef = ref("");
+        const handleFileOpen = async (file) => {
+          if (dataSyncingRef.value) return;
+          const extMap = {
+            newTab: [".pdf"],
+          };
+          const { dirname, filename, isDirectory, ext } = file;
+          if (isDirectory) {
+            socket.emit("openFolder", {
+              payload: {
+                dirname: dirname,
+                foldername: filename,
+              },
+            });
+          } else {
+            const url =
+              dirname === "/" ? `/${filename}` : `${dirname}/${filename}`;
+            const supportExt = Object.values(extMap).reduce((prev, cur) => {
+              prev = [...prev, ...cur];
+              return prev;
+            }, []);
+            if (!supportExt.includes(ext)) {
+              antd.message.error("不支持查看的文件");
+              return;
+            }
+            if (await canIRead(url)) {
+              if (extMap.newTab.includes(ext)) {
+                modalTitleRef.value = url;
+                modalVisibleRef.value = true;
+                modalContentTypeRef.value = "iframe";
+                setTimeout(() => {
+                  modalContentSrcRef.value = `/fs/read?url=${url}`;
+                }, 400);
+              }
+            }
+          }
+        };
+
+        return {
+          connectedRef,
+          handleConnection,
+          dirnameRef,
+          filesListRef,
+          handleBack,
+          refreshFileList,
+          dataSyncingRef,
+          handleFileOpen,
+          modalVisibleRef,
+          modalTitleRef,
+          modalContentTypeRef,
+          modalContentSrcRef,
+        };
+      },
+    })
+      .use(antd)
+      .mount("#root");
+  </script>
+</html>

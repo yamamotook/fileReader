@@ -1,0 +1,76 @@
+:root,
+body {
+  height: 100%;
+}
+[v-cloak] {
+  display: none;
+}
+.connect-switch {
+  position: fixed;
+  width: fit-content;
+  margin: 0 auto;
+  left: 0;
+  right: 0;
+  bottom: 8vh;
+}
+.view-container {
+  min-height: 100%;
+}
+.view-container .title {
+  background-color: #e6f7ff;
+  color: #1890ff;
+  padding: 24px 20px;
+  font-size: 26px;
+  text-align: center;
+  font-weight: 300;
+}
+.view-container .content-wrapper {
+  padding: 30px;
+}
+
+.view-container .content-header {
+  display: flex;
+  column-gap: 8px;
+}
+.view-container .content {
+  display: flex;
+  flex-direction: column;
+  column-gap: 8px;
+  margin-top: 12px;
+}
+.view-container .file-item {
+  padding: 10px;
+  display: flex;
+  column-gap: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.view-container .file-item:hover {
+  background-color: #e6f7ff;
+  transition: background-color 0.3s ease;
+}
+.view-container .file-icon {
+  font-size: 20px;
+}
+.flex-none {
+  flex: none;
+}
+.flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+.full-modal .ant-modal {
+  max-width: 100%;
+  top: 0;
+  padding-bottom: 0;
+  margin: 0;
+}
+.full-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh);
+}
+.full-modal .ant-modal-body {
+  flex: 1;
+  padding: 0;
+}
